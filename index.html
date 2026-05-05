@@ -131,12 +131,17 @@ th {
 
 .stockpile-button {
   width: 100%;
-  min-height: 72px;
-  font-size: 18px;
-  margin: 6px 0;
+  min-height: 90px;
+  font-size: 20px;
+  font-weight: bold;
+  margin: 0;
   background: #e2e8f0;
   color: #0f172a;
   border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
 }
 .stockpile-button.recorded {
   background: #16a34a;
@@ -144,14 +149,57 @@ th {
   border-color: #15803d;
 }
 .stockpile-button.flash {
-  transform: scale(0.98);
-  opacity: 0.85;
+  transform: scale(1.05);
+  background: #22c55e;
+  opacity: 1;
 }
 .stockpile-count {
-  display: block;
-  font-size: 26px;
+  display: inline-block;
+  font-size: 30px;
   font-weight: bold;
-  margin-top: 4px;
+  margin-left: 10px;
+}
+.stockpile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stockpile-button.waste-button {
+  grid-column: 1 / -1;
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.stockpile-button.waste-button.recorded {
+  background: #475569;
+  color: white;
+  border-color: #334155;
+}
+.stockpile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.stockpile-actions button {
+  margin: 0;
+  width: 100%;
+}
+.undo-button {
+  width: 100%;
+  min-height: 58px;
+  font-size: 20px;
+  margin: 14px 0 0 0;
+}
+.product-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+.product-name {
+  text-align: left;
+  line-height: 1.15;
 }
 
 </style>
@@ -308,14 +356,18 @@ th {
     <div class="card">
       <h3>Tap product for each bucket added</h3><div class="small" style="text-align:center;margin-bottom:10px;">Buttons turn green and show today’s count once recorded.</div>
 
-      <div id="stockpileButtons"></div>
+      <div id="stockpileButtons" class="stockpile-grid"></div>
 
-      <br>
-      <button class="secondary" onclick="undoStockpileBucket()">Undo Last</button>
-      <button class="danger" onclick="resetStockpileDay()">Reset Stockpile Day</button>
+      <button class="danger undo-button" onclick="undoStockpileBucket()">Undo Last Bucket</button>
+      <div class="stockpile-actions">
+        <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
+        <button class="secondary" onclick="goHome()">Home</button>
+      </div>
+      <button class="secondary" style="width:100%;margin-top:10px;" onclick="toggleStockpileTotals()">View / Hide Totals</button>
+      <button class="danger" style="width:100%;margin-top:10px;" onclick="resetStockpileDay()">Reset Stockpile Day</button>
     </div>
 
-    <div class="card">
+    <div class="card" id="stockpileTotalsCard" style="display:none;">
       <h3>Today’s Stockpile Totals</h3>
       <table>
         <thead>
@@ -329,8 +381,6 @@ th {
     </div>
 
     <div class="card">
-      <button class="secondary" onclick="goHome()">Home / Change Setup</button>
-      <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
       <div class="small" id="stockpileStatus">Ready</div>
     </div>
   </div>
@@ -894,18 +944,29 @@ function renderDynamicStockpileButtons() {
 
   container.innerHTML = "";
 
-  STOCKPILE_PRODUCTS.forEach(product => {
+  const sortedProducts = [
+    ...STOCKPILE_PRODUCTS.filter(p => p !== "Waste"),
+    ...STOCKPILE_PRODUCTS.filter(p => p === "Waste")
+  ];
+
+  sortedProducts.forEach(product => {
 
     const btn = document.createElement("button");
 
     btn.className = "stockpile-button";
     btn.dataset.product = product;
 
+    if (product === "Waste") {
+      btn.classList.add("waste-button");
+    }
+
     const count = stockpileState.totals[product] || 0;
 
     btn.innerHTML =
-      "<span>" + product + "</span>" +
-      "<span class='stockpile-count'>" + count + "</span>";
+      "<div class='product-row'>" +
+        "<span class='product-name'>" + product + "</span>" +
+        "<span class='stockpile-count'>" + count + "</span>" +
+      "</div>";
 
     if (count > 0) {
       btn.classList.add("recorded");
@@ -990,8 +1051,10 @@ function updateStockpileButtons() {
     const count = stockpileState.totals[product] || 0;
 
     btn.innerHTML =
-      "<span>" + product + "</span>" +
-      "<span class='stockpile-count'>" + count + "</span>";
+      "<div class='product-row'>" +
+        "<span class='product-name'>" + product + "</span>" +
+        "<span class='stockpile-count'>" + count + "</span>" +
+      "</div>";
 
     if (count > 0) {
       btn.classList.add("recorded");
@@ -1094,6 +1157,12 @@ function resetStockpileDay() {
 
   saveStockpileState();
   renderStockpileTotals();
+}
+
+function toggleStockpileTotals() {
+  const card = document.getElementById("stockpileTotalsCard");
+  if (!card) return;
+  card.style.display = card.style.display === "none" ? "block" : "none";
 }
 
 
