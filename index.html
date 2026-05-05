@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hopper Tracker</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  background: #f8fafc;
+}
+h2 {
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.card {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.grid {
+  display: grid;
+  gap: 12px;
+}
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.grid-4 {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.metric {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+.metric-label {
+  font-size: 13px;
+  color: #475569;
+}
+.metric-value {
+  font-size: 30px;
+  font-weight: bold;
+  margin-top: 6px;
+}
+label {
+  display: block;
+  text-align: left;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+input, textarea, button, select {
+  font-size: 16px;
+}
+input, textarea, select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+textarea {
+  min-height: 80px;
+}
+button {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #0f172a;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 6px;
+}
+button.secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+button.danger {
+  background: #b91c1c;
+}
+.small {
+  font-size: 13px;
+  color: #475569;
+  text-align: left;
+}
+.badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: bold;
+  background: #e2e8f0;
+}
+.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+.err {
+  background: #fee2e2;
+  color: #991b1b;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+th, td {
+  border-top: 1px solid #e2e8f0;
+  padding: 8px;
+  text-align: left;
+  font-size: 14px;
+}
+th {
+  background: #f1f5f9;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div id="startupScreen" class="card">
+
+    <h2>Hopper Tracker Setup</h2>
+
+    <div class="grid grid-2">
+
+      <div>
+        <label>Select Pit</label>
+        <select id="pitSelect">
+          <option value="Bond">Bond</option>
+          <option value="Custance">Custance</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Loader Role</label>
+        <select id="roleSelect">
+          <option value="feed">Feed Loader</option>
+          <option value="stockpile">Stockpile Loader</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Operator</label>
+        <input id="operatorSelect" placeholder="Operator name">
+      </div>
+
+    </div>
+
+    <button onclick="startApp()">START</button>
+
+  </div>
+
+  <div id="feedApp" style="display:none;">
+    <h2>Hopper Tracker</h2>
+
+  <div class="card grid grid-2">
+    <div>
+      <label>Site</label>
+      <input id="site" value="Custance">
+    </div>
+    <div>
+      <label>Operator</label>
+      <input id="operator" value="Loader">
+    </div>
+    <div>
+      <label>Hopper Radius (m)</label>
+      <input id="radius" type="number" value="20">
+    </div>
+    <div>
+      <label>Cooldown (sec)</label>
+      <input id="cooldown" type="number" value="30">
+    </div>
+  </div>
+
+  <div class="card grid grid-4">
+    <div class="metric">
+      <div class="metric-label">Trips</div>
+      <div class="metric-value" id="tripCount">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Trips / Hour</div>
+      <div class="metric-value" id="tripsPerHour">0.0</div>
+    </div>  </div>
+
+  <div class="card">
+    <div id="status">Waiting for GPS...</div>
+    <div style="margin-top:10px;">
+      <span class="badge" id="zoneBadge">Outside Hopper</span>
+      <span class="badge" id="syncBadge">Not connected</span>
+    </div>
+    <div class="small" id="gpsDetails" style="margin-top:10px;"></div>
+    <div class="small" id="hopperDetails" style="margin-top:6px;">Hopper Point: Not set</div>
+    <div class="small" id="dayDetails" style="margin-top:6px;"></div>
+  </div>
+
+  <div class="card">
+    <button onclick="manualTrip()" style="
+      width:100%;
+      height:120px;
+      font-size:30px;
+      font-weight:bold;
+      background:#16a34a;
+      color:white;
+      border:none;
+      border-radius:18px;
+      margin:8px 0 14px 0;
+    ">
+      +1 FEED BUCKET
+    </button>
+
+    <button class="danger" onclick="undoLastTrip()" style="
+      width:100%;
+      height:58px;
+      font-size:18px;
+      margin-bottom:14px;
+    ">
+      UNDO LAST BUCKET
+    </button>
+
+    <button class="secondary" onclick="goHome()">Home / Change Setup</button>
+    <button class="secondary" onclick="setHopper()">Set Hopper Point</button>
+    <button class="secondary" onclick="testWebhook()">Test Webhook</button>
+    <button class="danger" onclick="resetShift(true)">Reset Shift</button>
+  </div>
+
+  <div class="card">
+    <label>Notes</label>
+    <textarea id="notes" placeholder="Optional notes"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="small"><b>How it works:</b> tap +1 FEED BUCKET each time a bucket is fed. GPS still records position and hopper zone for validation. Hopper point is remembered. Counts reset automatically on a new day.</div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Event</th>
+          <th>Trip #</th>
+        </tr>
+      </thead>
+      <tbody id="eventLog"></tbody>
+    </table>
+  </div>
+
+  </div>
+
+  <div id="stockpileApp" style="display:none;">
+    <h2>Stockpile Loader</h2>
+
+    <div class="card grid grid-2">
+      <div>
+        <label>Site</label>
+        <input id="stockpileSite" value="Bond Pit">
+      </div>
+      <div>
+        <label>Operator</label>
+        <input id="stockpileOperator" value="Stockpile Loader">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tap product each time one bucket is added to stockpile</h3>
+
+      <div id="stockpileButtons"></div>
+
+      <br>
+      <button class="secondary" onclick="undoStockpileBucket()">Undo Last</button>
+      <button class="danger" onclick="resetStockpileDay()">Reset Stockpile Day</button>
+    </div>
+
+    <div class="card">
+      <h3>Today’s Stockpile Totals</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Buckets</th>
+          </tr>
+        </thead>
+        <tbody id="stockpileTotals"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <button class="secondary" onclick="goHome()">Home / Change Setup</button>
+      <div class="small" id="stockpileStatus">Ready</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let appMode = null;
+let cleanoutMode = false;
+
+const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV10";
+const inFlightEventIds = new Set();
+
+function makeEventId(prefix) {
+  return prefix + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 10);
+}
+
+function getOfflineQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveOfflineQueue(queue) {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function queuePayload(payloadObj) {
+  if (!payloadObj.eventId) {
+    payloadObj.eventId = makeEventId(payloadObj.loaderType || payloadObj.eventType || "event");
+  }
+
+  const queue = getOfflineQueue();
+
+  if (!queue.some(item => item.eventId === payloadObj.eventId)) {
+    queue.push(payloadObj);
+    saveOfflineQueue(queue);
+  }
+
+  updateQueueStatus();
+  return payloadObj.eventId;
+}
+
+function removeFromQueue(eventId) {
+  const queue = getOfflineQueue().filter(item => item.eventId !== eventId);
+  saveOfflineQueue(queue);
+  inFlightEventIds.delete(eventId);
+  updateQueueStatus();
+}
+
+function updateQueueStatus() {
+  const queue = getOfflineQueue();
+  const count = queue.length;
+
+  const syncBadge = document.getElementById("syncBadge");
+  if (syncBadge && syncBadge.textContent !== "Syncing...") {
+    syncBadge.textContent = count > 0 ? "Queued: " + count : "Connected";
+    syncBadge.className = "badge " + (count > 0 ? "warn" : "ok");
+  }
+
+  const stockpileStatus = document.getElementById("stockpileStatus");
+  if (stockpileStatus && count > 0) {
+    stockpileStatus.innerText = "Offline queue: " + count + " unsent";
+  }
+}
+
+function flushOfflineQueue() {
+  const queue = getOfflineQueue();
+
+  if (queue.length === 0) {
+    updateQueueStatus();
+    return;
+  }
+
+  queue.forEach(item => {
+
+    if (!item.eventId) {
+      item.eventId = makeEventId(item.loaderType || "event");
+    }
+
+    // Prevent same event being sent twice while still in flight
+    if (inFlightEventIds.has(item.eventId)) return;
+
+    inFlightEventIds.add(item.eventId);
+
+    fetch(EMBEDDED_WEBHOOK, {
+      method: "POST",
+      body: JSON.stringify(item)
+    })
+    .then(response => response.text())
+    .then(text => {
+      removeFromQueue(item.eventId);
+    })
+    .catch(err => {
+      console.log("Queue send failed:", err);
+      inFlightEventIds.delete(item.eventId);
+      updateQueueStatus();
+    });
+  });
+}
+
+window.addEventListener("online", flushOfflineQueue);
+setInterval(flushOfflineQueue, 30000);
+
+function goHome() {
+  document.getElementById("feedApp").style.display = "none";
+  document.getElementById("stockpileApp").style.display = "none";
+  document.getElementById("startupScreen").style.display = "block";
+
+  const savedPit = localStorage.getItem("selectedPit");
+  const savedRole = localStorage.getItem("selectedRole");
+  const savedOperator = localStorage.getItem("selectedOperator");
+
+  if (savedPit) document.getElementById("pitSelect").value = savedPit;
+  if (savedRole) document.getElementById("roleSelect").value = savedRole;
+  if (savedOperator) document.getElementById("operatorSelect").value = savedOperator;
+}
+
+let selectedPit = "";
+let selectedRole = "";
+let selectedOperator = "";
+
+function startApp() {
+  selectedPit = document.getElementById("pitSelect").value;
+  selectedRole = document.getElementById("roleSelect").value;
+  selectedOperator = document.getElementById("operatorSelect").value || "Operator";
+
+  localStorage.setItem("selectedPit", selectedPit);
+  localStorage.setItem("selectedRole", selectedRole);
+  localStorage.setItem("selectedOperator", selectedOperator);
+
+  document.getElementById("startupScreen").style.display = "none";
+  document.getElementById("feedApp").style.display = "none";
+  document.getElementById("stockpileApp").style.display = "none";
+
+  if (selectedRole === "feed") {
+    document.getElementById("feedApp").style.display = "block";
+    document.getElementById("site").value = selectedPit;
+    document.getElementById("operator").value = selectedOperator;
+
+    saveState();
+    setSyncBadge("Connected", "ok");
+
+  } else {
+    document.getElementById("stockpileApp").style.display = "block";
+    document.getElementById("stockpileSite").value = selectedPit;
+    document.getElementById("stockpileOperator").value = selectedOperator;
+
+    STOCKPILE_PRODUCTS = PIT_PRODUCTS[selectedPit] || PIT_PRODUCTS["Bond"];
+
+    stockpileState = {
+      lastResetDate: new Date().toDateString(),
+      totals: {},
+      lastEntry: null,
+      site: selectedPit,
+      operator: selectedOperator
+    };
+
+    renderDynamicStockpileButtons();
+
+    loadStockpileState();
+    setStockpileFormValues();
+    renderStockpileTotals();
+
+    const status = document.getElementById("stockpileStatus");
+    if (status) status.innerText = "Stockpile Mode Active";
+  }
+}
+
+function loadStartupDefaults() {
+  const savedPit = localStorage.getItem("selectedPit");
+  const savedRole = localStorage.getItem("selectedRole");
+  const savedOperator = localStorage.getItem("selectedOperator");
+
+  if (savedPit && document.getElementById("pitSelect")) {
+    document.getElementById("pitSelect").value = savedPit;
+  }
+
+  if (savedRole && document.getElementById("roleSelect")) {
+    document.getElementById("roleSelect").value = savedRole;
+  }
+
+  if (savedOperator && document.getElementById("operatorSelect")) {
+    document.getElementById("operatorSelect").value = savedOperator;
+  }
+}
+
+function setMode(mode) {
+  appMode = mode;
+
+  // Keep mode buttons visible so you can switch any time
+  document.getElementById("feedApp").style.display = "none";
+  document.getElementById("stockpileApp").style.display = "none";
+
+  if (mode === "feed") {
+    document.getElementById("feedApp").style.display = "block";
+
+    // Show connection status right away
+    setSyncBadge("Connected", "ok");
+
+    // Initial feed connection ping
+    saveState();
+    sendToSheet("feed_mode_started");
+
+  } else {
+    document.getElementById("stockpileApp").style.display = "block";
+
+    loadStockpileState();
+    setStockpileFormValues();
+    renderStockpileTotals();
+
+    const status = document.getElementById("stockpileStatus");
+    if (status) status.innerText = "Stockpile Mode Active";
+  }
+}
+
+function toggleCleanout() {
+  cleanoutMode = !cleanoutMode;
+
+  document.getElementById("cleanoutBtn").innerText =
+    "Cleanout Mode: " + (cleanoutMode ? "ON" : "OFF");
+}
+
+const STORAGE_KEY = "hopperTrackerStateV3";
+const EMBEDDED_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZwW-EqvvdPU4f2EDGUyRVgGkJ-tBT36CJv9LMjTCyT5r1me8xMelFzCz409HfwWSG9Q/exec";
+
+let state = {
+  hopper: null,
+  inside: false,
+  tripCount: 0,
+  cooldown: false,
+  lastPos: null,
+  shiftStart: Date.now(),
+  enteredHopperAt: null,
+  lastTripTime: null,
+  dwellTimes: [],
+  cycleTimes: [],
+  events: [],
+  lastResetDate: new Date().toDateString(),
+  site: "Custance",
+  operator: "Loader",
+  radius: 20,
+  cooldownSec: 30,
+  notes: ""
+};
+
+const STOCKPILE_STORAGE_KEY_BASE = "stockpileTrackerStateV1";
+
+function getStockpileStorageKey() {
+  const pit = selectedPit || document.getElementById("stockpileSite")?.value || "Bond";
+  return STOCKPILE_STORAGE_KEY_BASE + "_" + pit;
+}
+const PIT_PRODUCTS = {
+  Bond: [
+    "Concrete Sand",
+    "2\" Single",
+    "2\" Double",
+    "1\" Inch",
+    "PeaStone",
+    "3 to 8 Rock",
+    "Waste"
+  ],
+
+  Custance: [
+    "Septic Sand",
+    "Cable Sand",
+    "1 Inch Clear",
+    "2 Inch Clear",
+    "Half Inch",
+    "3 to 8 Rock",
+    "Waste",
+    "Class A",
+    "Topsoil"
+  ]
+};
+
+let STOCKPILE_PRODUCTS = PIT_PRODUCTS["Bond"];
+
+let stockpileState = {
+  lastResetDate: new Date().toDateString(),
+  totals: {},
+  lastEntry: null,
+  site: "Bond Pit",
+  operator: "Stockpile Loader"
+};
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw);
+    state = Object.assign(state, saved);
+  } catch (e) {
+    console.log("Load state error:", e);
+  }
+}
+
+function saveState() {
+  state.site = document.getElementById("site").value;
+  state.operator = document.getElementById("operator").value;
+  state.radius = Number(document.getElementById("radius").value || 20);
+  state.cooldownSec = Number(document.getElementById("cooldown").value || 30);
+  state.notes = document.getElementById("notes").value;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function maybeResetForNewDay() {
+  const today = new Date().toDateString();
+  if (state.lastResetDate !== today) {
+    state.tripCount = 0;
+    state.inside = false;
+    state.cooldown = false;
+    state.shiftStart = Date.now();
+    state.enteredHopperAt = null;
+    state.lastTripTime = null;
+    state.dwellTimes = [];
+    state.cycleTimes = [];
+    state.events = [];
+    state.lastResetDate = today;
+    addEvent("new_day_auto_reset");
+    saveState();
+  }
+}
+
+function setSyncBadge(text, cls) {
+  const el = document.getElementById("syncBadge");
+  el.textContent = text;
+  el.className = "badge " + cls;
+}
+
+function addEvent(type, tripNum = "") {
+  state.events.unshift({
+    time: new Date().toLocaleTimeString(),
+    type: type,
+    tripNum: tripNum
+  });
+  if (state.events.length > 100) state.events = state.events.slice(0, 100);
+  renderEvents();
+  saveState();
+}
+
+function renderEvents() {
+  const tbody = document.getElementById("eventLog");
+  tbody.innerHTML = "";
+  if (state.events.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='3'>No events yet</td></tr>";
+    return;
+  }
+  state.events.forEach(e => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + e.time + "</td><td>" + e.type + "</td><td>" + e.tripNum + "</td>";
+    tbody.appendChild(tr);
+  });
+}
+
+function distance(lat1, lon1, lat2, lon2) {
+  let R = 6371000;
+  let dLat = (lat2 - lat1) * Math.PI / 180;
+  let dLon = (lon2 - lon1) * Math.PI / 180;
+  let a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function radius() {
+  return Number(document.getElementById("radius").value || 20);
+}
+
+function cooldownMs() {
+  return Number(document.getElementById("cooldown").value || 30) * 1000;
+}
+
+function avg(arr) {
+  if (!arr.length) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function updateMetrics() {
+  const tripEl = document.getElementById("tripCount");
+  const tphEl = document.getElementById("tripsPerHour");
+  const avgCycleEl = document.getElementById("avgCycle");
+  const avgDwellEl = document.getElementById("avgDwell");
+  const dayEl = document.getElementById("dayDetails");
+
+  if (tripEl) tripEl.innerText = state.tripCount;
+
+  const runHours = (Date.now() - state.shiftStart) / 3600000;
+  const tph = runHours > 0 ? state.tripCount / runHours : 0;
+
+  if (tphEl) tphEl.innerText = tph.toFixed(1);
+  if (avgCycleEl) avgCycleEl.innerText = Math.round(avg(state.cycleTimes)) + "s";
+  if (avgDwellEl) avgDwellEl.innerText = Math.round(avg(state.dwellTimes)) + "s";
+
+  if (dayEl) {
+    dayEl.innerText = "Current day: " + state.lastResetDate;
+  }
+}
+
+function updateZoneBadge(isInside) {
+  const badge = document.getElementById("zoneBadge");
+  badge.textContent = isInside ? "Inside Hopper" : "Outside Hopper";
+  badge.className = "badge";
+}
+
+function setFormValues() {
+  document.getElementById("site").value = state.site || "Custance";
+  document.getElementById("operator").value = state.operator || "Loader";
+  document.getElementById("radius").value = state.radius || 20;
+  document.getElementById("cooldown").value = state.cooldownSec || 30;
+  document.getElementById("notes").value = state.notes || "";
+}
+
+function updateHopperDetails() {
+  if (state.hopper) {
+    document.getElementById("hopperDetails").innerText =
+      "Hopper Point: " + state.hopper.lat + ", " + state.hopper.lng;
+  } else {
+    document.getElementById("hopperDetails").innerText = "Hopper Point: Not set";
+  }
+}
+
+function setHopper() {
+  if (state.lastPos) {
+    state.hopper = { lat: state.lastPos.lat, lng: state.lastPos.lng };
+    updateHopperDetails();
+    saveState();
+    alert("Hopper set and saved");
+    addEvent("hopper_set");
+  } else {
+    alert("Waiting for GPS...");
+  }
+}
+
+function payload(source) {
+  const runHours = (Date.now() - state.shiftStart) / 3600000;
+  const tph = runHours > 0 ? state.tripCount / runHours : 0;
+
+  return {
+    timestamp: new Date().toISOString(),
+    site: document.getElementById("site").value,
+    operator: document.getElementById("operator").value,
+    tripCount: state.tripCount,
+    tripsPerHour: Number(tph.toFixed(2)),
+    avgCycleSec: Number(avg(state.cycleTimes).toFixed(1)),
+    avgDwellSec: Number(avg(state.dwellTimes).toFixed(1)),
+    radiusM: radius(),
+    cooldownSec: Number(document.getElementById("cooldown").value || 30),
+    zone: state.inside ? "Inside Hopper" : "Outside Hopper",
+    lat: state.lastPos ? state.lastPos.lat : "",
+    lng: state.lastPos ? state.lastPos.lng : "",
+    accuracyM: state.lastPos && state.lastPos.accuracy ? Math.round(state.lastPos.accuracy) : "",
+    notes: document.getElementById("notes").value,
+    source: source,
+    eventType: cleanoutMode ? "cleanout" : "feed",
+    loaderType: "feed",
+    eventId: makeEventId("feed")
+  };
+}
+
+function sendToSheet(source) {
+  setSyncBadge("Syncing...", "warn");
+
+  const payloadObj = payload(source);
+  queuePayload(payloadObj);
+  flushOfflineQueue();
+
+  setTimeout(function() {
+    const queue = getOfflineQueue();
+    if (queue.length > 0) {
+      setSyncBadge("Queued: " + queue.length, "warn");
+    } else {
+      setSyncBadge("Sent", "ok");
+    }
+  }, 1500);
+}
+
+function testWebhook() {
+  saveState();
+  sendToSheet("test");
+  addEvent("webhook_test");
+}
+
+function manualTrip() {
+  state.tripCount++;
+  updateMetrics();
+  addEvent("manual_trip", state.tripCount);
+
+  const now = Date.now();
+  if (state.lastTripTime) {
+    state.cycleTimes.push((now - state.lastTripTime) / 1000);
+  }
+  state.lastTripTime = now;
+
+  saveState();
+  sendToSheet("manual_trip");
+}
+
+function undoLastTrip() {
+  if (state.tripCount <= 0) {
+    alert("No feed buckets to undo.");
+    return;
+  }
+
+  state.tripCount--;
+  updateMetrics();
+  addEvent("manual_undo", state.tripCount);
+
+  saveState();
+  sendToSheet("manual_undo");
+}
+
+function resetShift(manual = false) {
+  state.inside = false;
+  state.tripCount = 0;
+  state.cooldown = false;
+  state.shiftStart = Date.now();
+  state.enteredHopperAt = null;
+  state.lastTripTime = null;
+  state.dwellTimes = [];
+  state.cycleTimes = [];
+  state.events = [];
+  state.lastResetDate = new Date().toDateString();
+  updateMetrics();
+  updateZoneBadge(false);
+  renderEvents();
+  if (manual) addEvent("manual_reset");
+  saveState();
+}
+
+
+
+function renderDynamicStockpileButtons() {
+
+  const container = document.getElementById("stockpileButtons");
+
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  STOCKPILE_PRODUCTS.forEach(product => {
+
+    const btn = document.createElement("button");
+
+    btn.innerText = product + " +1";
+
+    btn.onclick = function() {
+      if (btn.disabled) return;
+
+      btn.disabled = true;
+
+      addStockpileBucket(product);
+
+      setTimeout(function() {
+        btn.disabled = false;
+      }, 600);
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+function loadStockpileState() {
+  const raw = localStorage.getItem(getStockpileStorageKey());
+  if (raw) {
+    try {
+      stockpileState = Object.assign(stockpileState, JSON.parse(raw));
+    } catch (e) {
+      console.log("Load stockpile state error:", e);
+    }
+  }
+
+  STOCKPILE_PRODUCTS.forEach(product => {
+    if (stockpileState.totals[product] === undefined) {
+      stockpileState.totals[product] = 0;
+    }
+  });
+
+  const today = new Date().toDateString();
+  if (stockpileState.lastResetDate !== today) {
+    stockpileState.totals = {};
+    STOCKPILE_PRODUCTS.forEach(product => stockpileState.totals[product] = 0);
+    stockpileState.lastEntry = null;
+    stockpileState.lastResetDate = today;
+  }
+
+  stockpileState.site = selectedPit || stockpileState.site;
+  stockpileState.operator = selectedOperator || stockpileState.operator;
+}
+
+function saveStockpileState() {
+  const siteEl = document.getElementById("stockpileSite");
+  const operatorEl = document.getElementById("stockpileOperator");
+
+  if (siteEl) stockpileState.site = siteEl.value;
+  if (operatorEl) stockpileState.operator = operatorEl.value;
+
+  localStorage.setItem(getStockpileStorageKey(), JSON.stringify(stockpileState));
+}
+
+function renderStockpileTotals() {
+  const tbody = document.getElementById("stockpileTotals");
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  STOCKPILE_PRODUCTS.forEach(product => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + product + "</td><td>" + (stockpileState.totals[product] || 0) + "</td>";
+    tbody.appendChild(tr);
+  });
+}
+
+function setStockpileFormValues() {
+  const siteEl = document.getElementById("stockpileSite");
+  const operatorEl = document.getElementById("stockpileOperator");
+
+  if (siteEl) siteEl.value = stockpileState.site || "Bond Pit";
+  if (operatorEl) operatorEl.value = stockpileState.operator || "Stockpile Loader";
+}
+
+function stockpilePayload(product, source) {
+  return {
+    timestamp: new Date().toISOString(),
+    site: document.getElementById("stockpileSite").value,
+    operator: document.getElementById("stockpileOperator").value,
+
+    // Stockpile entries should be one bucket per button tap; undo sends -1
+    tripCount: source === "stockpile_undo" ? -1 : 1,
+
+    tripsPerHour: "",
+    avgCycleSec: "",
+    avgDwellSec: "",
+    radiusM: "",
+    cooldownSec: "",
+    zone: "",
+    lat: "",
+    lng: "",
+    accuracyM: "",
+
+    // Keep notes blank for stockpile so product does not land in Notes column
+    notes: "",
+
+    source: source,
+    loaderType: "stockpile",
+    product: product,
+    buckets: source === "stockpile_undo" ? -1 : 1,
+    eventId: makeEventId("stockpile")
+  };
+}
+
+function sendStockpileToSheet(product, source) {
+  const status = document.getElementById("stockpileStatus");
+  if (status) status.innerText = "Syncing " + product + "...";
+
+  const payloadObj = stockpilePayload(product, source);
+  queuePayload(payloadObj);
+  flushOfflineQueue();
+
+  setTimeout(function() {
+    if (status) {
+      const queue = getOfflineQueue();
+      status.innerText = queue.length > 0 ? "Queued: " + queue.length + " unsent" : "Synced: " + product;
+    }
+  }, 1000);
+}
+
+function addStockpileBucket(product) {
+  stockpileState.totals[product] = (stockpileState.totals[product] || 0) + 1;
+  stockpileState.lastEntry = {
+    product: product,
+    time: Date.now()
+  };
+
+  saveStockpileState();
+  renderStockpileTotals();
+  sendStockpileToSheet(product, "stockpile_bucket");
+}
+
+function undoStockpileBucket() {
+  if (!stockpileState.lastEntry || !stockpileState.lastEntry.product) {
+    alert("No stockpile entry to undo.");
+    return;
+  }
+
+  const product = stockpileState.lastEntry.product;
+  stockpileState.totals[product] = Math.max(0, (stockpileState.totals[product] || 0) - 1);
+
+  saveStockpileState();
+  renderStockpileTotals();
+  sendStockpileToSheet(product, "stockpile_undo");
+
+  stockpileState.lastEntry = null;
+  saveStockpileState();
+}
+
+function resetStockpileDay() {
+  if (!confirm("Reset today’s stockpile totals on this phone?")) return;
+
+  stockpileState.totals = {};
+  STOCKPILE_PRODUCTS.forEach(product => stockpileState.totals[product] = 0);
+  stockpileState.lastEntry = null;
+  stockpileState.lastResetDate = new Date().toDateString();
+
+  saveStockpileState();
+  renderStockpileTotals();
+}
+
+
+loadState();
+maybeResetForNewDay();
+
+navigator.geolocation.watchPosition(
+  function(pos) {
+    let lat = pos.coords.latitude;
+    let lng = pos.coords.longitude;
+    let accuracy = pos.coords.accuracy;
+
+    state.lastPos = { lat, lng, accuracy };
+
+    document.getElementById("status").innerHTML =
+      "Lat: " + lat + "<br>Lng: " + lng;
+
+    document.getElementById("gpsDetails").innerText =
+      "Accuracy: " + Math.round(accuracy) + " m | Radius: " + radius() + " m";
+
+    if (!state.hopper) {
+      saveState();
+      return;
+    }
+
+    let d = distance(lat, lng, state.hopper.lat, state.hopper.lng);
+
+    if (d < radius() && !state.inside) {
+      state.inside = true;
+      state.enteredHopperAt = Date.now();
+      updateZoneBadge(true);
+      addEvent("entered_hopper");
+    }
+
+    if (d > radius() && state.inside && !state.cooldown) {
+      state.inside = false;
+      updateZoneBadge(false);
+
+      if (state.enteredHopperAt) {
+        state.dwellTimes.push((Date.now() - state.enteredHopperAt) / 1000);
+      }
+
+      // GPS is now used for validation only.
+      // Feed bucket counts are entered manually with the large +1 button.
+      addEvent("gps_hopper_exit");
+
+      updateMetrics();
+      saveState();
+
+      state.cooldown = true;
+      setTimeout(function() {
+        state.cooldown = false;
+        saveState();
+      }, cooldownMs());
+    }
+
+    saveState();
+  },
+
+  function(err) {
+    document.getElementById("status").innerHTML =
+      "GPS error: " + err.message;
+  },
+
+  {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 5000
+  }
+);
+
+document.getElementById("site").addEventListener("input", saveState);
+document.getElementById("operator").addEventListener("input", saveState);
+document.getElementById("radius").addEventListener("input", function() {
+  updateMetrics();
+  saveState();
+});
+document.getElementById("cooldown").addEventListener("input", saveState);
+document.getElementById("notes").addEventListener("input", saveState);
+
+const stockpileSiteInput = document.getElementById("stockpileSite");
+const stockpileOperatorInput = document.getElementById("stockpileOperator");
+if (stockpileSiteInput) stockpileSiteInput.addEventListener("input", saveStockpileState);
+if (stockpileOperatorInput) stockpileOperatorInput.addEventListener("input", saveStockpileState);
+
+loadStartupDefaults();
+setFormValues();
+updateMetrics();
+updateZoneBadge(state.inside);
+updateHopperDetails();
+renderEvents();
+updateQueueStatus();
+flushOfflineQueue();
+</script>
+
+</body>
+</html>
