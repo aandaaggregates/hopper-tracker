@@ -128,6 +128,32 @@ th, td {
 th {
   background: #f1f5f9;
 }
+
+.stockpile-button {
+  width: 100%;
+  min-height: 72px;
+  font-size: 18px;
+  margin: 6px 0;
+  background: #e2e8f0;
+  color: #0f172a;
+  border: 2px solid #cbd5e1;
+}
+.stockpile-button.recorded {
+  background: #16a34a;
+  color: white;
+  border-color: #15803d;
+}
+.stockpile-button.flash {
+  transform: scale(0.98);
+  opacity: 0.85;
+}
+.stockpile-count {
+  display: block;
+  font-size: 26px;
+  font-weight: bold;
+  margin-top: 4px;
+}
+
 </style>
 </head>
 <body>
@@ -167,7 +193,7 @@ th {
   </div>
 
   <div id="feedApp" style="display:none;">
-    <h2>Hopper Tracker</h2>
+    <h2>Feed Loader</h2>
 
   <div class="card grid grid-2">
     <div>
@@ -188,15 +214,18 @@ th {
     </div>
   </div>
 
-  <div class="card grid grid-4">
-    <div class="metric">
-      <div class="metric-label">Trips</div>
-      <div class="metric-value" id="tripCount">0</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center;">
+      <div class="metric">
+        <div class="metric-label">Feed Buckets</div>
+        <div class="metric-value" id="tripCount">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Buckets / Hour</div>
+        <div class="metric-value" id="tripsPerHour">0.0</div>
+      </div>
     </div>
-    <div class="metric">
-      <div class="metric-label">Trips / Hour</div>
-      <div class="metric-value" id="tripsPerHour">0.0</div>
-    </div>  </div>
+  </div>
 
   <div class="card">
     <div id="status">Waiting for GPS...</div>
@@ -210,25 +239,32 @@ th {
   </div>
 
   <div class="card">
-    <button class="secondary" onclick="goHome()">Home / Change Setup</button>
-    <button onclick="setHopper()">Set Hopper Point</button>
-    <button onclick="toggleCleanout()" id="cleanoutBtn">Cleanout Mode: OFF</button>
     <button onclick="manualTrip()" style="
       width:100%;
-      height:120px;
-      font-size:28px;
+      height:145px;
+      font-size:34px;
       font-weight:bold;
       background:#16a34a;
       color:white;
       border:none;
-      border-radius:16px;
-      margin-bottom:15px;
+      border-radius:20px;
+      margin:8px 0 14px 0;
+      box-shadow:0 4px 10px rgba(0,0,0,0.15);
     ">
       +1 FEED BUCKET
     </button>
-    <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
-    <button class="secondary" onclick="testWebhook()">Test Webhook</button>
-    <button class="danger" onclick="resetShift(true)">Reset Shift</button>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
+      <button class="secondary" onclick="goHome()">Home</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+      <button class="secondary" onclick="setHopper()">Set Hopper</button>
+      <button class="danger" onclick="resetShift(true)">Reset Shift</button>
+    </div>
+
+    <button class="secondary" onclick="testWebhook()" style="margin-top:8px;">Test Webhook</button>
   </div>
 
   <div class="card">
@@ -237,7 +273,7 @@ th {
   </div>
 
   <div class="card">
-    <div class="small"><b>How it works:</b> a trip counts when the phone enters the hopper zone and then leaves it. Hopper point is remembered. Counts reset automatically on a new day.</div>
+    <div class="small"><b>How it works:</b> tap +1 FEED BUCKET each time a bucket is fed. GPS still records position and hopper zone for validation. Hopper point is remembered. Counts reset automatically on a new day.</div>
   </div>
 
   <div class="card">
@@ -270,7 +306,7 @@ th {
     </div>
 
     <div class="card">
-      <h3>Tap product each time one bucket is added to stockpile</h3>
+      <h3>Tap product for each bucket added</h3><div class="small" style="text-align:center;margin-bottom:10px;">Buttons turn green and show today’s count once recorded.</div>
 
       <div id="stockpileButtons"></div>
 
@@ -305,7 +341,7 @@ th {
 let appMode = null;
 let cleanoutMode = false;
 
-const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV13";
+const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV15";
 const inFlightEventIds = new Set();
 
 function makeEventId(prefix) {
@@ -862,18 +898,31 @@ function renderDynamicStockpileButtons() {
 
     const btn = document.createElement("button");
 
-    btn.innerText = product + " +1";
+    btn.className = "stockpile-button";
+    btn.dataset.product = product;
+
+    const count = stockpileState.totals[product] || 0;
+
+    btn.innerHTML =
+      "<span>" + product + "</span>" +
+      "<span class='stockpile-count'>" + count + "</span>";
+
+    if (count > 0) {
+      btn.classList.add("recorded");
+    }
 
     btn.onclick = function() {
       if (btn.disabled) return;
 
       btn.disabled = true;
+      btn.classList.add("flash");
 
       addStockpileBucket(product);
 
       setTimeout(function() {
+        btn.classList.remove("flash");
         btn.disabled = false;
-      }, 600);
+      }, 450);
     };
 
     container.appendChild(btn);
@@ -928,6 +977,27 @@ function renderStockpileTotals() {
     const tr = document.createElement("tr");
     tr.innerHTML = "<td>" + product + "</td><td>" + (stockpileState.totals[product] || 0) + "</td>";
     tbody.appendChild(tr);
+  });
+
+  updateStockpileButtons();
+}
+
+function updateStockpileButtons() {
+  STOCKPILE_PRODUCTS.forEach(product => {
+    const btn = document.querySelector(".stockpile-button[data-product='" + CSS.escape(product) + "']");
+    if (!btn) return;
+
+    const count = stockpileState.totals[product] || 0;
+
+    btn.innerHTML =
+      "<span>" + product + "</span>" +
+      "<span class='stockpile-count'>" + count + "</span>";
+
+    if (count > 0) {
+      btn.classList.add("recorded");
+    } else {
+      btn.classList.remove("recorded");
+    }
   });
 }
 
