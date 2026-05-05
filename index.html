@@ -210,31 +210,22 @@ th {
   </div>
 
   <div class="card">
+    <button class="secondary" onclick="goHome()">Home / Change Setup</button>
+    <button onclick="setHopper()">Set Hopper Point</button>
+    <button onclick="toggleCleanout()" id="cleanoutBtn">Cleanout Mode: OFF</button>
     <button onclick="manualTrip()" style="
       width:100%;
       height:120px;
-      font-size:30px;
+      font-size:28px;
       font-weight:bold;
       background:#16a34a;
       color:white;
       border:none;
-      border-radius:18px;
-      margin:8px 0 14px 0;
+      border-radius:16px;
+      margin-bottom:15px;
     ">
       +1 FEED BUCKET
     </button>
-
-    <button class="danger" onclick="undoLastTrip()" style="
-      width:100%;
-      height:58px;
-      font-size:18px;
-      margin-bottom:14px;
-    ">
-      UNDO LAST BUCKET
-    </button>
-
-    <button class="secondary" onclick="goHome()">Home / Change Setup</button>
-    <button class="secondary" onclick="setHopper()">Set Hopper Point</button>
     <button class="secondary" onclick="testWebhook()">Test Webhook</button>
     <button class="danger" onclick="resetShift(true)">Reset Shift</button>
   </div>
@@ -245,7 +236,7 @@ th {
   </div>
 
   <div class="card">
-    <div class="small"><b>How it works:</b> tap +1 FEED BUCKET each time a bucket is fed. GPS still records position and hopper zone for validation. Hopper point is remembered. Counts reset automatically on a new day.</div>
+    <div class="small"><b>How it works:</b> a trip counts when the phone enters the hopper zone and then leaves it. Hopper point is remembered. Counts reset automatically on a new day.</div>
   </div>
 
   <div class="card">
@@ -312,7 +303,7 @@ th {
 let appMode = null;
 let cleanoutMode = false;
 
-const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV10";
+const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV3";
 const inFlightEventIds = new Set();
 
 function makeEventId(prefix) {
@@ -776,13 +767,8 @@ function sendToSheet(source) {
   flushOfflineQueue();
 
   setTimeout(function() {
-    const queue = getOfflineQueue();
-    if (queue.length > 0) {
-      setSyncBadge("Queued: " + queue.length, "warn");
-    } else {
-      setSyncBadge("Sent", "ok");
-    }
-  }, 1500);
+    updateQueueStatus();
+  }, 1000);
 }
 
 function testWebhook() {
@@ -804,20 +790,6 @@ function manualTrip() {
 
   saveState();
   sendToSheet("manual_trip");
-}
-
-function undoLastTrip() {
-  if (state.tripCount <= 0) {
-    alert("No feed buckets to undo.");
-    return;
-  }
-
-  state.tripCount--;
-  updateMetrics();
-  addEvent("manual_undo", state.tripCount);
-
-  saveState();
-  sendToSheet("manual_undo");
 }
 
 function resetShift(manual = false) {
@@ -1056,12 +1028,21 @@ navigator.geolocation.watchPosition(
         state.dwellTimes.push((Date.now() - state.enteredHopperAt) / 1000);
       }
 
-      // GPS is now used for validation only.
-      // Feed bucket counts are entered manually with the large +1 button.
-      addEvent("gps_hopper_exit");
+      if (!cleanoutMode) {
+        state.tripCount++;
+        addEvent("trip_counted", state.tripCount);
+      } else {
+        addEvent("cleanout_only");
+      }
+
+      if (state.lastTripTime) {
+        state.cycleTimes.push((Date.now() - state.lastTripTime) / 1000);
+      }
+      state.lastTripTime = Date.now();
 
       updateMetrics();
       saveState();
+      sendToSheet(cleanoutMode ? "cleanout_only" : "trip_counted");
 
       state.cooldown = true;
       setTimeout(function() {
