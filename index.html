@@ -226,6 +226,7 @@ th {
     ">
       +1 FEED BUCKET
     </button>
+    <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
     <button class="secondary" onclick="testWebhook()">Test Webhook</button>
     <button class="danger" onclick="resetShift(true)">Reset Shift</button>
   </div>
@@ -293,6 +294,7 @@ th {
 
     <div class="card">
       <button class="secondary" onclick="goHome()">Home / Change Setup</button>
+      <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
       <div class="small" id="stockpileStatus">Ready</div>
     </div>
   </div>
@@ -303,7 +305,7 @@ th {
 let appMode = null;
 let cleanoutMode = false;
 
-const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV12";
+const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV13";
 const inFlightEventIds = new Set();
 
 function makeEventId(prefix) {
@@ -366,7 +368,7 @@ let queueFlushRunning = false;
 function flushOfflineQueue() {
   if (queueFlushRunning) return;
 
-  const queue = getOfflineQueue();
+  let queue = getOfflineQueue();
 
   if (queue.length === 0) {
     updateQueueStatus();
@@ -374,49 +376,66 @@ function flushOfflineQueue() {
   }
 
   queueFlushRunning = true;
-  sendNextQueuedItem();
-}
 
-function sendNextQueuedItem() {
-  const queue = getOfflineQueue();
+  // Make sure every queued item has an event ID before sending.
+  queue = queue.map(item => {
+    if (!item.eventId) {
+      item.eventId = makeEventId(item.loaderType || "event");
+    }
+    return item;
+  });
 
-  if (queue.length === 0) {
-    queueFlushRunning = false;
-    updateQueueStatus();
-    return;
-  }
-
-  const item = queue[0];
-
-  if (!item.eventId) {
-    item.eventId = makeEventId(item.loaderType || "event");
-    queue[0] = item;
-    saveOfflineQueue(queue);
-  }
+  saveOfflineQueue(queue);
+  updateQueueStatus();
 
   fetch(EMBEDDED_WEBHOOK, {
     method: "POST",
-    body: JSON.stringify(item)
+    body: JSON.stringify({
+      batch: true,
+      events: queue
+    })
   })
   .then(response => response.text())
   .then(text => {
-    removeFromQueue(item.eventId);
+    let result = {};
+    try {
+      result = JSON.parse(text);
+    } catch (e) {
+      result = {};
+    }
 
-    setTimeout(function() {
-      sendNextQueuedItem();
-    }, 500);
+    // If the batch succeeded, remove all successfully processed/duplicate event IDs.
+    const completedIds = result.completedEventIds || [];
+
+    if (completedIds.length > 0) {
+      const remaining = getOfflineQueue().filter(item => !completedIds.includes(item.eventId));
+      saveOfflineQueue(remaining);
+    }
+
+    queueFlushRunning = false;
+    updateQueueStatus();
+
+    // If anything remains, try again after a short pause.
+    if (getOfflineQueue().length > 0) {
+      setTimeout(flushOfflineQueue, 3000);
+    }
   })
   .catch(err => {
-    console.log("Queue send failed:", err);
+    console.log("Batch queue send failed:", err);
 
-    // Leave the unsent item in the queue for the next retry.
+    // Keep all unsent items safely queued for retry.
     queueFlushRunning = false;
     updateQueueStatus();
   });
 }
 
 window.addEventListener("online", flushOfflineQueue);
-setInterval(flushOfflineQueue, 60000);
+window.addEventListener("focus", flushOfflineQueue);
+window.addEventListener("pageshow", flushOfflineQueue);
+document.addEventListener("visibilitychange", function() {
+  if (!document.hidden) flushOfflineQueue();
+});
+setInterval(flushOfflineQueue, 15000);
 
 function goHome() {
   document.getElementById("feedApp").style.display = "none";
