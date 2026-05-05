@@ -303,7 +303,7 @@ th {
 let appMode = null;
 let cleanoutMode = false;
 
-const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV3";
+const OFFLINE_QUEUE_KEY = "hopperTrackerOfflineQueueV12";
 const inFlightEventIds = new Set();
 
 function makeEventId(prefix) {
@@ -361,7 +361,11 @@ function updateQueueStatus() {
   }
 }
 
+let queueFlushRunning = false;
+
 function flushOfflineQueue() {
+  if (queueFlushRunning) return;
+
   const queue = getOfflineQueue();
 
   if (queue.length === 0) {
@@ -369,35 +373,50 @@ function flushOfflineQueue() {
     return;
   }
 
-  queue.forEach(item => {
+  queueFlushRunning = true;
+  sendNextQueuedItem();
+}
 
-    if (!item.eventId) {
-      item.eventId = makeEventId(item.loaderType || "event");
-    }
+function sendNextQueuedItem() {
+  const queue = getOfflineQueue();
 
-    // Prevent same event being sent twice while still in flight
-    if (inFlightEventIds.has(item.eventId)) return;
+  if (queue.length === 0) {
+    queueFlushRunning = false;
+    updateQueueStatus();
+    return;
+  }
 
-    inFlightEventIds.add(item.eventId);
+  const item = queue[0];
 
-    fetch(EMBEDDED_WEBHOOK, {
-      method: "POST",
-      body: JSON.stringify(item)
-    })
-    .then(response => response.text())
-    .then(text => {
-      removeFromQueue(item.eventId);
-    })
-    .catch(err => {
-      console.log("Queue send failed:", err);
-      inFlightEventIds.delete(item.eventId);
-      updateQueueStatus();
-    });
+  if (!item.eventId) {
+    item.eventId = makeEventId(item.loaderType || "event");
+    queue[0] = item;
+    saveOfflineQueue(queue);
+  }
+
+  fetch(EMBEDDED_WEBHOOK, {
+    method: "POST",
+    body: JSON.stringify(item)
+  })
+  .then(response => response.text())
+  .then(text => {
+    removeFromQueue(item.eventId);
+
+    setTimeout(function() {
+      sendNextQueuedItem();
+    }, 500);
+  })
+  .catch(err => {
+    console.log("Queue send failed:", err);
+
+    // Leave the unsent item in the queue for the next retry.
+    queueFlushRunning = false;
+    updateQueueStatus();
   });
 }
 
 window.addEventListener("online", flushOfflineQueue);
-setInterval(flushOfflineQueue, 30000);
+setInterval(flushOfflineQueue, 60000);
 
 function goHome() {
   document.getElementById("feedApp").style.display = "none";
