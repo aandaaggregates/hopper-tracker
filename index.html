@@ -202,6 +202,112 @@ th {
   line-height: 1.15;
 }
 
+.feed-metric-primary .metric-value {
+  font-size: 46px;
+}
+.feed-metric-secondary .metric-value {
+  font-size: 32px;
+}
+.status-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.feed-undo-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  font-weight: bold;
+  font-size: 18px;
+}
+.feed-undo-bar button {
+  margin: 0;
+  padding: 8px 12px;
+  background: #166534;
+  color: white;
+}
+.feed-location-footer {
+  font-size: 12px;
+  color: #475569;
+  text-align: center;
+  line-height: 1.45;
+}
+.hopper-footer-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hopper-footer-row button {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+.compact-card {
+  padding: 12px;
+}
+
+.fuel-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.55);
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.fuel-modal-content {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  text-align: left;
+}
+.fuel-modal-content h3 {
+  margin: 0 0 14px 0;
+  text-align: center;
+}
+.fuel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.fuel-actions button {
+  width: 100%;
+  margin: 0;
+}
+.fuel-save {
+  background: #16a34a;
+}
+.fuel-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@media (max-width: 520px) {
+  body { padding: 10px; }
+  h2 { margin-bottom: 10px; }
+  .card { margin-bottom: 10px; }
+  .feed-metric-primary .metric-value { font-size: 52px; }
+  .feed-metric-secondary .metric-value { font-size: 30px; }
+}
+
 </style>
 </head>
 <body>
@@ -264,29 +370,31 @@ th {
 
   <div class="card">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center;">
-      <div class="metric">
+      <div class="metric feed-metric-primary">
         <div class="metric-label">Feed Buckets</div>
         <div class="metric-value" id="tripCount">0</div>
       </div>
-      <div class="metric">
+      <div class="metric feed-metric-secondary">
         <div class="metric-label">Buckets / Hour</div>
         <div class="metric-value" id="tripsPerHour">0.0</div>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div id="status">Waiting for GPS...</div>
-    <div style="margin-top:10px;">
+  <div class="card compact-card">
+    <div class="status-row">
       <span class="badge" id="zoneBadge">Outside Hopper</span>
       <span class="badge" id="syncBadge">Not connected</span>
     </div>
-    <div class="small" id="gpsDetails" style="margin-top:10px;"></div>
-    <div class="small" id="hopperDetails" style="margin-top:6px;">Hopper Point: Not set</div>
-    <div class="small" id="dayDetails" style="margin-top:6px;"></div>
+    <div class="small" id="status" style="display:none;">Waiting for GPS...</div>
   </div>
 
   <div class="card">
+    <div id="feedUndoBar" class="feed-undo-bar">
+      <span id="feedUndoText">+1 Feed Bucket recorded</span>
+      <button onclick="undoFeedBucket()">UNDO</button>
+    </div>
+
     <button onclick="manualTrip()" style="
       width:100%;
       height:145px;
@@ -307,12 +415,22 @@ th {
       <button class="secondary" onclick="goHome()">Home</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-      <button class="secondary" onclick="setHopper()">Set Hopper</button>
-      <button class="danger" onclick="resetShift(true)">Reset Shift</button>
-    </div>
+    <button class="danger" onclick="resetShift(true)" style="width:100%;margin-top:8px;">Reset Shift</button>
+
+    <button class="secondary fuel-button" onclick="openFuelModal()">Fuel Fill-Up</button>
 
     <button class="secondary" onclick="testWebhook()" style="margin-top:8px;">Test Webhook</button>
+  </div>
+
+  <div class="card compact-card">
+    <div class="feed-location-footer">
+      <div id="gpsDetails">Location not available yet</div>
+      <div class="hopper-footer-row">
+        <span id="hopperDetails">Hopper: Not Set</span>
+        <button class="secondary" onclick="setHopper()">Update</button>
+      </div>
+      <div id="dayDetails" style="margin-top:6px;"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -363,6 +481,7 @@ th {
         <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
         <button class="secondary" onclick="goHome()">Home</button>
       </div>
+      <button class="secondary fuel-button" onclick="openFuelModal()">Fuel Fill-Up</button>
       <button class="secondary" style="width:100%;margin-top:10px;" onclick="toggleStockpileTotals()">View / Hide Totals</button>
       <button class="danger" style="width:100%;margin-top:10px;" onclick="resetStockpileDay()">Reset Stockpile Day</button>
     </div>
@@ -385,6 +504,28 @@ th {
     </div>
   </div>
 
+</div>
+
+<div id="fuelModal" class="fuel-modal">
+  <div class="fuel-modal-content">
+    <h3>Fuel Fill-Up</h3>
+
+    <label>Machine</label>
+    <select id="fuelMachine">
+      <option value="2023 JD 744">2023 JD 744</option>
+      <option value="2025 JD 744">2025 JD 744</option>
+      <option value="2025 LiuGong 877">2025 LiuGong 877</option>
+      <option value="2020 Komatsu 380">2020 Komatsu 380</option>
+    </select>
+
+    <label style="margin-top:12px;">Litres</label>
+    <input id="fuelLitres" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Enter litres">
+
+    <div class="fuel-actions">
+      <button class="secondary" onclick="closeFuelModal()">Cancel</button>
+      <button class="fuel-save" onclick="saveFuelEntry()">Save Fuel</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -644,6 +785,10 @@ function toggleCleanout() {
 
 const STORAGE_KEY = "hopperTrackerStateV3";
 const EMBEDDED_WEBHOOK = "https://script.google.com/macros/s/AKfycbzZwW-EqvvdPU4f2EDGUyRVgGkJ-tBT36CJv9LMjTCyT5r1me8xMelFzCz409HfwWSG9Q/exec";
+const FUEL_MACHINE_KEY = "hopperTrackerLastFuelMachineV1";
+
+let feedLastAction = null;
+let feedUndoTimer = null;
 
 let state = {
   hopper: null,
@@ -818,14 +963,14 @@ function updateMetrics() {
   if (avgDwellEl) avgDwellEl.innerText = Math.round(avg(state.dwellTimes)) + "s";
 
   if (dayEl) {
-    dayEl.innerText = "Current day: " + state.lastResetDate;
+    dayEl.innerText = state.lastResetDate;
   }
 }
 
 function updateZoneBadge(isInside) {
   const badge = document.getElementById("zoneBadge");
   badge.textContent = isInside ? "Inside Hopper" : "Outside Hopper";
-  badge.className = "badge";
+  badge.className = "badge " + (isInside ? "ok" : "err");
 }
 
 function setFormValues() {
@@ -837,11 +982,13 @@ function setFormValues() {
 }
 
 function updateHopperDetails() {
+  const el = document.getElementById("hopperDetails");
+  if (!el) return;
+
   if (state.hopper) {
-    document.getElementById("hopperDetails").innerText =
-      "Hopper Point: " + state.hopper.lat + ", " + state.hopper.lng;
+    el.innerText = "Hopper: Set ✓";
   } else {
-    document.getElementById("hopperDetails").innerText = "Hopper Point: Not set";
+    el.innerText = "Hopper: Not Set ⚠️";
   }
 }
 
@@ -850,7 +997,7 @@ function setHopper() {
     state.hopper = { lat: state.lastPos.lat, lng: state.lastPos.lng };
     updateHopperDetails();
     saveState();
-    alert("Hopper set and saved");
+    alert("Hopper location updated and saved.");
     addEvent("hopper_set");
   } else {
     alert("Waiting for GPS...");
@@ -887,12 +1034,22 @@ function sendToSheet(source) {
   setSyncBadge("Syncing...", "warn");
 
   const payloadObj = payload(source);
-  queuePayload(payloadObj);
+
+  if (source === "manual_trip_undo") {
+    payloadObj.tripCount = state.tripCount;
+    payloadObj.source = "manual_trip_undo";
+    payloadObj.eventType = "feed_undo";
+    payloadObj.buckets = -1;
+  }
+
+  const eventId = queuePayload(payloadObj);
   flushOfflineQueue();
 
   setTimeout(function() {
     updateQueueStatus();
   }, 1000);
+
+  return eventId;
 }
 
 function testWebhook() {
@@ -901,22 +1058,80 @@ function testWebhook() {
   addEvent("webhook_test");
 }
 
+function showFeedUndoBar() {
+  const bar = document.getElementById("feedUndoBar");
+  if (!bar) return;
+
+  bar.style.display = "flex";
+
+  if (feedUndoTimer) clearTimeout(feedUndoTimer);
+  feedUndoTimer = setTimeout(function() {
+    bar.style.display = "none";
+    feedLastAction = null;
+  }, 5000);
+}
+
 function manualTrip() {
   state.tripCount++;
-  updateMetrics();
-  addEvent("manual_trip", state.tripCount);
 
   const now = Date.now();
+  const previousLastTripTime = state.lastTripTime;
+  let cycleAdded = null;
+
   if (state.lastTripTime) {
-    state.cycleTimes.push((now - state.lastTripTime) / 1000);
+    cycleAdded = (now - state.lastTripTime) / 1000;
+    state.cycleTimes.push(cycleAdded);
   }
+
   state.lastTripTime = now;
 
+  const eventId = sendToSheet("manual_trip");
+
+  feedLastAction = {
+    type: "manual_trip",
+    eventId: eventId,
+    previousLastTripTime: previousLastTripTime,
+    cycleAdded: cycleAdded
+  };
+
+  updateMetrics();
+  addEvent("manual_trip", state.tripCount);
   saveState();
-  sendToSheet("manual_trip");
+  showFeedUndoBar();
+}
+
+function undoFeedBucket() {
+  if (!feedLastAction || feedLastAction.type !== "manual_trip") {
+    alert("No feed bucket to undo.");
+    return;
+  }
+
+  state.tripCount = Math.max(0, state.tripCount - 1);
+
+  if (feedLastAction.cycleAdded !== null && state.cycleTimes.length > 0) {
+    state.cycleTimes.pop();
+  }
+
+  state.lastTripTime = feedLastAction.previousLastTripTime;
+
+  if (feedLastAction.eventId) {
+    removeFromQueue(feedLastAction.eventId);
+  }
+
+  sendToSheet("manual_trip_undo");
+  addEvent("manual_trip_undo", state.tripCount);
+  updateMetrics();
+  saveState();
+
+  const bar = document.getElementById("feedUndoBar");
+  if (bar) bar.style.display = "none";
+  if (feedUndoTimer) clearTimeout(feedUndoTimer);
+  feedLastAction = null;
 }
 
 function resetShift(manual = false) {
+  if (manual && !confirm("Reset this feed shift on this phone?")) return;
+
   state.inside = false;
   state.tripCount = 0;
   state.cooldown = false;
@@ -935,6 +1150,100 @@ function resetShift(manual = false) {
 }
 
 
+
+
+function openFuelModal() {
+  const modal = document.getElementById("fuelModal");
+  const machineEl = document.getElementById("fuelMachine");
+  const litresEl = document.getElementById("fuelLitres");
+
+  const savedMachine = localStorage.getItem(FUEL_MACHINE_KEY);
+  if (savedMachine && machineEl) machineEl.value = savedMachine;
+  if (litresEl) litresEl.value = "";
+
+  if (modal) modal.style.display = "flex";
+  setTimeout(function() {
+    if (litresEl) litresEl.focus();
+  }, 100);
+}
+
+function closeFuelModal() {
+  const modal = document.getElementById("fuelModal");
+  if (modal) modal.style.display = "none";
+}
+
+function fuelPayload(machine, litres) {
+  let site = selectedPit || "";
+  let operator = selectedOperator || "";
+
+  const feedVisible = document.getElementById("feedApp")?.style.display !== "none";
+  const stockpileVisible = document.getElementById("stockpileApp")?.style.display !== "none";
+
+  if (feedVisible) {
+    site = document.getElementById("site")?.value || site;
+    operator = document.getElementById("operator")?.value || operator;
+  } else if (stockpileVisible) {
+    site = document.getElementById("stockpileSite")?.value || site;
+    operator = document.getElementById("stockpileOperator")?.value || operator;
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    site: site,
+    operator: operator,
+    tripCount: "",
+    tripsPerHour: "",
+    avgCycleSec: "",
+    avgDwellSec: "",
+    radiusM: "",
+    cooldownSec: "",
+    zone: "",
+    lat: state.lastPos ? state.lastPos.lat : "",
+    lng: state.lastPos ? state.lastPos.lng : "",
+    accuracyM: state.lastPos && state.lastPos.accuracy ? Math.round(state.lastPos.accuracy) : "",
+    notes: "",
+    source: "fuel_fill",
+    eventType: "fuel_fill",
+    loaderType: "fuel",
+    machine: machine,
+    litres: litres,
+    eventId: makeEventId("fuel")
+  };
+}
+
+function saveFuelEntry() {
+  const machineEl = document.getElementById("fuelMachine");
+  const litresEl = document.getElementById("fuelLitres");
+
+  const machine = machineEl ? machineEl.value : "";
+  const litres = litresEl ? Number(litresEl.value) : 0;
+
+  if (!machine) {
+    alert("Select a machine.");
+    return;
+  }
+
+  if (!litres || litres <= 0) {
+    alert("Enter litres added.");
+    return;
+  }
+
+  localStorage.setItem(FUEL_MACHINE_KEY, machine);
+
+  queuePayload(fuelPayload(machine, litres));
+  flushOfflineQueue();
+  updateQueueStatus();
+
+  const stockpileVisible = document.getElementById("stockpileApp")?.style.display !== "none";
+  if (stockpileVisible) {
+    const status = document.getElementById("stockpileStatus");
+    if (status) status.innerText = "Fuel saved: " + machine + " - " + litres + " L";
+  } else {
+    addEvent("fuel_fill: " + machine + " - " + litres + " L", "");
+  }
+
+  closeFuelModal();
+}
 
 function renderDynamicStockpileButtons() {
 
@@ -1178,10 +1487,10 @@ navigator.geolocation.watchPosition(
     state.lastPos = { lat, lng, accuracy };
 
     document.getElementById("status").innerHTML =
-      "Lat: " + lat + "<br>Lng: " + lng;
+      "GPS active";
 
     document.getElementById("gpsDetails").innerText =
-      "Accuracy: " + Math.round(accuracy) + " m | Radius: " + radius() + " m";
+      "📍 " + lat.toFixed(6) + ", " + lng.toFixed(6) + " | Acc: " + Math.round(accuracy) + " m | Radius: " + radius() + " m";
 
     if (!state.hopper) {
       saveState();
@@ -1234,6 +1543,9 @@ navigator.geolocation.watchPosition(
   function(err) {
     document.getElementById("status").innerHTML =
       "GPS error: " + err.message;
+
+    const gpsDetails = document.getElementById("gpsDetails");
+    if (gpsDetails) gpsDetails.innerText = "GPS error: " + err.message;
   },
 
   {
@@ -1251,6 +1563,13 @@ document.getElementById("radius").addEventListener("input", function() {
 });
 document.getElementById("cooldown").addEventListener("input", saveState);
 document.getElementById("notes").addEventListener("input", saveState);
+
+const fuelModal = document.getElementById("fuelModal");
+if (fuelModal) {
+  fuelModal.addEventListener("click", function(e) {
+    if (e.target === fuelModal) closeFuelModal();
+  });
+}
 
 const stockpileSiteInput = document.getElementById("stockpileSite");
 const stockpileOperatorInput = document.getElementById("stockpileOperator");
