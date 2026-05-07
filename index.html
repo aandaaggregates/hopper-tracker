@@ -472,13 +472,13 @@ th {
     </div>
 
     <div class="card">
-      <h3>Tap product for each bucket added</h3><div class="small" style="text-align:center;margin-bottom:10px;">Buttons turn green and show today’s count once recorded.</div>
+      <h3>Tap product for each bucket added</h3><div class="small" style="text-align:center;margin-bottom:10px;">Counts stay on this phone during the day. Submit totals at end of day.</div>
 
       <div id="stockpileButtons" class="stockpile-grid"></div>
 
       <button class="danger undo-button" onclick="undoStockpileBucket()">Undo Last Bucket</button>
       <div class="stockpile-actions">
-        <button class="secondary" onclick="flushOfflineQueue()">Sync Now</button>
+        <button class="secondary" onclick="submitStockpileTotals()">Submit Totals</button>
         <button class="secondary" onclick="goHome()">Home</button>
       </div>
       <button class="secondary fuel-button" onclick="openFuelModal()">Fuel Fill-Up</button>
@@ -725,7 +725,7 @@ function startApp() {
     renderStockpileTotals();
 
     const status = document.getElementById("stockpileStatus");
-    if (status) status.innerText = "Stockpile Mode Active";
+    if (status) status.innerText = "Stockpile Mode Active. Counts are local until Submit Totals.";
   }
 }
 
@@ -772,7 +772,7 @@ function setMode(mode) {
     renderStockpileTotals();
 
     const status = document.getElementById("stockpileStatus");
-    if (status) status.innerText = "Stockpile Mode Active";
+    if (status) status.innerText = "Stockpile Mode Active. Counts are local until Submit Totals.";
   }
 }
 
@@ -1436,7 +1436,9 @@ function addStockpileBucket(product) {
 
   saveStockpileState();
   renderStockpileTotals();
-  sendStockpileToSheet(product, "stockpile_bucket");
+
+  const status = document.getElementById("stockpileStatus");
+  if (status) status.innerText = "Local count updated. Submit totals at end of day.";
 }
 
 function undoStockpileBucket() {
@@ -1448,12 +1450,75 @@ function undoStockpileBucket() {
   const product = stockpileState.lastEntry.product;
   stockpileState.totals[product] = Math.max(0, (stockpileState.totals[product] || 0) - 1);
 
-  saveStockpileState();
-  renderStockpileTotals();
-  sendStockpileToSheet(product, "stockpile_undo");
-
   stockpileState.lastEntry = null;
   saveStockpileState();
+  renderStockpileTotals();
+
+  const status = document.getElementById("stockpileStatus");
+  if (status) status.innerText = "Undo saved locally. Submit totals at end of day.";
+}
+
+function stockpileSummaryPayload(product, buckets, summaryDate) {
+  return {
+    timestamp: new Date().toISOString(),
+    site: document.getElementById("stockpileSite").value,
+    operator: document.getElementById("stockpileOperator").value,
+    tripCount: buckets,
+    tripsPerHour: "",
+    avgCycleSec: "",
+    avgDwellSec: "",
+    radiusM: "",
+    cooldownSec: "",
+    zone: "",
+    lat: "",
+    lng: "",
+    accuracyM: "",
+    notes: "End-of-day stockpile summary",
+    source: "stockpile_daily_summary",
+    loaderType: "stockpile",
+    eventType: "stockpile_daily_summary",
+    product: product,
+    buckets: buckets,
+    eventId: "stockpile_summary_" + summaryDate.replace(/\W/g, "_") + "_" + (document.getElementById("stockpileSite").value || "site").replace(/\W/g, "_") + "_" + product.replace(/\W/g, "_")
+  };
+}
+
+function submitStockpileTotals() {
+  saveStockpileState();
+
+  const summaryDate = stockpileState.lastResetDate || new Date().toDateString();
+  const submittedKey = "stockpileSubmitted_" + getStockpileStorageKey() + "_" + summaryDate.replace(/\W/g, "_");
+  const alreadySubmitted = localStorage.getItem(submittedKey) === "yes";
+
+  const entries = STOCKPILE_PRODUCTS
+    .map(product => ({ product: product, buckets: Number(stockpileState.totals[product] || 0) }))
+    .filter(item => item.buckets > 0);
+
+  if (entries.length === 0) {
+    alert("No stockpile totals to submit.");
+    return;
+  }
+
+  if (alreadySubmitted) {
+    alert("Stockpile totals have already been submitted today from this phone. To avoid duplicate dashboard totals, do not submit again unless the Raw Data rows were deleted.");
+    return;
+  }
+
+  const totalBuckets = entries.reduce((sum, item) => sum + item.buckets, 0);
+  if (!confirm("Submit today's stockpile totals to Sheets?\n\nProducts: " + entries.length + "\nTotal buckets: " + totalBuckets)) {
+    return;
+  }
+
+  entries.forEach(item => {
+    queuePayload(stockpileSummaryPayload(item.product, item.buckets, summaryDate));
+  });
+
+  localStorage.setItem(submittedKey, "yes");
+  flushOfflineQueue();
+  updateQueueStatus();
+
+  const status = document.getElementById("stockpileStatus");
+  if (status) status.innerText = "Stockpile totals submitted/queued. Queue will clear when online.";
 }
 
 function resetStockpileDay() {
