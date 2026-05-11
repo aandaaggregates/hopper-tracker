@@ -828,7 +828,8 @@ const PIT_PRODUCTS = {
     "3 to 8 Rock",
     "Waste",
     "Class A",
-    "Topsoil"
+    "Topsoil",
+    "Pit Run"
   ]
 };
 
@@ -1005,7 +1006,7 @@ function payload(source) {
     avgCycleSec: Number(avg(state.cycleTimes).toFixed(1)),
     avgDwellSec: Number(avg(state.dwellTimes).toFixed(1)),
     radiusM: radius(),
-    cooldownSec: Number(document.getElementById("cooldown").value || 30),
+    cooldownSec: 30,
     zone: state.inside ? "Inside Hopper" : "Outside Hopper",
     lat: state.lastPos ? state.lastPos.lat : "",
     lng: state.lastPos ? state.lastPos.lng : "",
