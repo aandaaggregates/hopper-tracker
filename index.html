@@ -358,14 +358,6 @@ th {
       <label>Operator</label>
       <input id="operator" value="Loader">
     </div>
-    <div>
-      <label>Hopper Radius (m)</label>
-      <input id="radius" type="number" value="20">
-    </div>
-    <div>
-      <label>Cooldown (sec)</label>
-      <input id="cooldown" type="number" value="30">
-    </div>
   </div>
 
   <div class="card">
@@ -864,8 +856,6 @@ function loadState() {
 function saveState() {
   state.site = document.getElementById("site").value;
   state.operator = document.getElementById("operator").value;
-  state.radius = Number(document.getElementById("radius").value || 20);
-  state.cooldownSec = Number(document.getElementById("cooldown").value || 30);
   state.notes = document.getElementById("notes").value;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
@@ -934,11 +924,11 @@ function distance(lat1, lon1, lat2, lon2) {
 }
 
 function radius() {
-  return Number(document.getElementById("radius").value || 20);
+  return 15;
 }
 
 function cooldownMs() {
-  return Number(document.getElementById("cooldown").value || 30) * 1000;
+  return 30000;
 }
 
 function avg(arr) {
@@ -976,8 +966,6 @@ function updateZoneBadge(isInside) {
 function setFormValues() {
   document.getElementById("site").value = state.site || "Custance";
   document.getElementById("operator").value = state.operator || "Loader";
-  document.getElementById("radius").value = state.radius || 20;
-  document.getElementById("cooldown").value = state.cooldownSec || 30;
   document.getElementById("notes").value = state.notes || "";
 }
 
@@ -1550,7 +1538,7 @@ navigator.geolocation.watchPosition(
       "GPS active";
 
     document.getElementById("gpsDetails").innerText =
-      "📍 " + lat.toFixed(6) + ", " + lng.toFixed(6) + " | Acc: " + Math.round(accuracy) + " m | Radius: " + radius() + " m";
+      "📍 " + lat.toFixed(6) + ", " + lng.toFixed(6) + " | Acc: " + Math.round(accuracy) + " m";
 
     if (!state.hopper) {
       saveState();
@@ -1617,11 +1605,6 @@ navigator.geolocation.watchPosition(
 
 document.getElementById("site").addEventListener("input", saveState);
 document.getElementById("operator").addEventListener("input", saveState);
-document.getElementById("radius").addEventListener("input", function() {
-  updateMetrics();
-  saveState();
-});
-document.getElementById("cooldown").addEventListener("input", saveState);
 document.getElementById("notes").addEventListener("input", saveState);
 
 const fuelModal = document.getElementById("fuelModal");
