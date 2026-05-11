@@ -472,13 +472,13 @@ th {
     </div>
 
     <div class="card">
-      <h3>Tap product for each bucket added</h3><div class="small" style="text-align:center;margin-bottom:10px;">Counts stay on this phone during the day. Submit totals at end of day.</div>
+      <h3>Tap product for each bucket added</h3><div class="small" style="text-align:center;margin-bottom:10px;">Counts stay on this phone. Submit a snapshot anytime; dashboard should use latest snapshot only.</div>
 
       <div id="stockpileButtons" class="stockpile-grid"></div>
 
       <button class="danger undo-button" onclick="undoStockpileBucket()">Undo Last Bucket</button>
       <div class="stockpile-actions">
-        <button class="secondary" onclick="submitStockpileTotals()">Submit Totals</button>
+        <button class="secondary" onclick="submitStockpileTotals()">Submit Snapshot</button>
         <button class="secondary" onclick="goHome()">Home</button>
       </div>
       <button class="secondary fuel-button" onclick="openFuelModal()">Fuel Fill-Up</button>
@@ -725,7 +725,7 @@ function startApp() {
     renderStockpileTotals();
 
     const status = document.getElementById("stockpileStatus");
-    if (status) status.innerText = "Stockpile Mode Active. Counts are local until Submit Totals.";
+    if (status) status.innerText = "Stockpile Mode Active. Counts are local until Submit Snapshot.";
   }
 }
 
@@ -772,7 +772,7 @@ function setMode(mode) {
     renderStockpileTotals();
 
     const status = document.getElementById("stockpileStatus");
-    if (status) status.innerText = "Stockpile Mode Active. Counts are local until Submit Totals.";
+    if (status) status.innerText = "Stockpile Mode Active. Counts are local until Submit Snapshot.";
   }
 }
 
@@ -1438,7 +1438,7 @@ function addStockpileBucket(product) {
   renderStockpileTotals();
 
   const status = document.getElementById("stockpileStatus");
-  if (status) status.innerText = "Local count updated. Submit totals at end of day.";
+  if (status) status.innerText = "Local count updated. Submit snapshot anytime.";
 }
 
 function undoStockpileBucket() {
@@ -1455,10 +1455,10 @@ function undoStockpileBucket() {
   renderStockpileTotals();
 
   const status = document.getElementById("stockpileStatus");
-  if (status) status.innerText = "Undo saved locally. Submit totals at end of day.";
+  if (status) status.innerText = "Undo saved locally. Submit snapshot anytime.";
 }
 
-function stockpileSummaryPayload(product, buckets, summaryDate) {
+function stockpileSummaryPayload(product, buckets, summaryDate, snapshotId) {
   return {
     timestamp: new Date().toISOString(),
     site: document.getElementById("stockpileSite").value,
@@ -1473,13 +1473,15 @@ function stockpileSummaryPayload(product, buckets, summaryDate) {
     lat: "",
     lng: "",
     accuracyM: "",
-    notes: "End-of-day stockpile summary",
-    source: "stockpile_daily_summary",
+    notes: "Stockpile snapshot total | " + snapshotId,
+    source: "stockpile_snapshot",
     loaderType: "stockpile",
-    eventType: "stockpile_daily_summary",
+    eventType: "stockpile_snapshot",
     product: product,
     buckets: buckets,
-    eventId: "stockpile_summary_" + summaryDate.replace(/\W/g, "_") + "_" + (document.getElementById("stockpileSite").value || "site").replace(/\W/g, "_") + "_" + product.replace(/\W/g, "_")
+    snapshotDate: summaryDate,
+    snapshotId: snapshotId,
+    eventId: snapshotId + "_" + product.replace(/\W/g, "_")
   };
 }
 
@@ -1487,9 +1489,6 @@ function submitStockpileTotals() {
   saveStockpileState();
 
   const summaryDate = stockpileState.lastResetDate || new Date().toDateString();
-  const submittedKey = "stockpileSubmitted_" + getStockpileStorageKey() + "_" + summaryDate.replace(/\W/g, "_");
-  const alreadySubmitted = localStorage.getItem(submittedKey) === "yes";
-
   const entries = STOCKPILE_PRODUCTS
     .map(product => ({ product: product, buckets: Number(stockpileState.totals[product] || 0) }))
     .filter(item => item.buckets > 0);
@@ -1499,26 +1498,22 @@ function submitStockpileTotals() {
     return;
   }
 
-  if (alreadySubmitted) {
-    alert("Stockpile totals have already been submitted today from this phone. To avoid duplicate dashboard totals, do not submit again unless the Raw Data rows were deleted.");
+  const totalBuckets = entries.reduce((sum, item) => sum + item.buckets, 0);
+  if (!confirm("Submit current stockpile snapshot to Sheets?\n\nThis can be submitted more than once per day. Dashboard should use the latest snapshot only.\n\nProducts: " + entries.length + "\nTotal buckets: " + totalBuckets)) {
     return;
   }
 
-  const totalBuckets = entries.reduce((sum, item) => sum + item.buckets, 0);
-  if (!confirm("Submit today's stockpile totals to Sheets?\n\nProducts: " + entries.length + "\nTotal buckets: " + totalBuckets)) {
-    return;
-  }
+  const snapshotId = "stockpile_snapshot_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 
   entries.forEach(item => {
-    queuePayload(stockpileSummaryPayload(item.product, item.buckets, summaryDate));
+    queuePayload(stockpileSummaryPayload(item.product, item.buckets, summaryDate, snapshotId));
   });
 
-  localStorage.setItem(submittedKey, "yes");
   flushOfflineQueue();
   updateQueueStatus();
 
   const status = document.getElementById("stockpileStatus");
-  if (status) status.innerText = "Stockpile totals submitted/queued. Queue will clear when online.";
+  if (status) status.innerText = "Stockpile snapshot submitted/queued. Submit again later if totals change.";
 }
 
 function resetStockpileDay() {
